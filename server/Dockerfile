@@ -31,6 +31,8 @@ COPY --from=build /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY --from=build /app/dist ./dist
 COPY package.json package-lock.json tsconfig.json prisma.config.ts ./
 COPY prisma ./prisma
+COPY bin ./bin
+RUN chmod +x ./bin/*.sh
 
 # Never run as root.
 USER node

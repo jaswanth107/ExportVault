@@ -37,7 +37,7 @@ services:
     plan: free
     rootDir: server
     dockerfilePath: ./Dockerfile
-    dockerCommand: sh -c "npx prisma migrate deploy && node dist/server.js"
+    dockerCommand: ./bin/start-api.sh
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -85,7 +85,7 @@ services:
     plan: free
     rootDir: server
     dockerfilePath: ./Dockerfile
-    dockerCommand: node dist/worker.js
+    dockerCommand: ./bin/start-worker.sh
     healthCheckPath: /health
     autoDeploy: true
     envVars:

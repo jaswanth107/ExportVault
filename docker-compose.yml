@@ -75,7 +75,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: exportvault-api
-    command: ["node", "dist/server.js"]
+    command: ["./bin/start-api.sh"]
     env_file: .env
     environment:
       NODE_ENV: development
@@ -107,7 +107,7 @@ services:
       context: ./server
       dockerfile: Dockerfile
     container_name: exportvault-worker
-    command: ["node", "dist/worker.js"]
+    command: ["./bin/start-worker.sh"]
     env_file: .env
     environment:
       NODE_ENV: development
