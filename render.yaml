@@ -64,13 +64,15 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         sync: false          # R2 secret access key
       - key: AWS_REGION
-        value: auto
+        sync: false          # Supabase: your project region (e.g. ap-south-1). R2: auto
       - key: S3_BUCKET
         sync: false
       - key: S3_ENDPOINT
         sync: false          # https://<account-id>.r2.cloudflarestorage.com
       - key: S3_FORCE_PATH_STYLE
         value: "1"
+      - key: S3_RESPONSE_OVERRIDES
+        value: "0"           # Supabase Storage does not support them. Set "1" for R2/S3.
       - key: LOG_LEVEL
         value: info
 
@@ -106,13 +108,15 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
       - key: AWS_REGION
-        value: auto
+        sync: false          # Supabase: your project region (e.g. ap-south-1). R2: auto
       - key: S3_BUCKET
         sync: false
       - key: S3_ENDPOINT
         sync: false
       - key: S3_FORCE_PATH_STYLE
         value: "1"
+      - key: S3_RESPONSE_OVERRIDES
+        value: "0"           # Supabase Storage does not support them. Set "1" for R2/S3.
       - key: WORKER_CONCURRENCY
         value: "2"
       - key: EXPORT_BATCH_SIZE
