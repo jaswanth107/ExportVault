@@ -1,0 +1,75 @@
+
+> exportvault-server@1.0.0 pretest:concurrency
+> npm run build
+
+
+> exportvault-server@1.0.0 build
+> tsc -p tsconfig.json
+
+
+> exportvault-server@1.0.0 test:concurrency
+> vitest run src/tests/concurrency
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/nxtwave/export-vault/server
+
+stdout | src/tests/concurrency/interruption.test.ts
+◇ injected env (20) from ../.env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+{"level":"error","time":"2026-09-03T05:04:07.557Z","service":"exportvault","event":"EXPORT_INTERRUPTED","exportJobId":"65daea46-6813-4580-aee0-3d42aead20e8","exportedRowCount":10000,"lastHeartbeat":"2026-09-03T05:04:04.985Z","msg":"Export marked INTERRUPTED: worker heartbeat expired"}
+stdout | src/tests/concurrency/interruption.test.ts > interruption and resume > survives a hard worker crash and resumes to exactly 50,000 unique rows
+
+  INTERRUPTION TEST: crashed at 10000 rows, resumed, finished with 50000 rows / 50000 unique / 0 duplicates
+
+
+ ✓ src/tests/concurrency/interruption.test.ts > interruption and resume > survives a hard worker crash and resumes to exactly 50,000 unique rows
+ ✓ src/tests/concurrency/interruption.test.ts > interruption and resume > survives a hard worker crash and resumes to exactly 50,000 unique rows 37455ms
+{"level":"error","time":"2026-09-03T05:04:44.894Z","service":"exportvault","event":"EXPORT_INTERRUPTED","exportJobId":"48af2166-ea5a-4660-b57c-fdab89283282","exportedRowCount":10000,"lastHeartbeat":"2026-09-03T05:04:42.349Z","msg":"Export marked INTERRUPTED: worker heartbeat expired"}
+stdout | src/tests/concurrency/interruption.test.ts > interruption and resume > is idempotent when a crash lands between writing a chunk and checkpointing it
+
+  RE-WRITE IDEMPOTENCY: replayed batch 40, still 50000 rows / 0 duplicates
+
+
+ ✓ src/tests/concurrency/interruption.test.ts > interruption and resume > is idempotent when a crash lands between writing a chunk and checkpointing it
+ ✓ src/tests/concurrency/interruption.test.ts > interruption and resume > is idempotent when a crash lands between writing a chunk and checkpointing it 37297ms
+stdout | src/tests/concurrency/verification.test.ts
+◇ injected env (0) from ../.env // tip: ◈ encrypted .env [www.dotenvx.com]
+
+stdout | src/tests/concurrency/verification.test.ts > verification engine end to end > exports exactly 50,000 unique rows and proves it
+
+  ================ VERIFICATION EVIDENCE ================
+  DATABASE RECORDS AVAILABLE : 60000
+  SNAPSHOT BOUNDARY (max id) : 60000
+  EXPORT TARGET              : 50000
+  CSV ACTUAL ROWS            : 50000
+  CSV UNIQUE IDs             : 50000
+  CSV DUPLICATES             : 0
+  CSV MIN / MAX ID           : 1 / 50000
+  ROWS BEYOND SNAPSHOT       : 0
+  FILE BYTES                 : 8316137
+  SHA-256                    : b6bedb10c2dba7219fd52d88671b5032d73ba4c7548022efe5d5f8502f17833c
+  VERIFICATION STATUS        : PASSED
+  ======================================================
+
+
+ ✓ src/tests/concurrency/verification.test.ts > verification engine end to end > exports exactly 50,000 unique rows and proves it
+ ✓ src/tests/concurrency/verification.test.ts > verification engine end to end > exports exactly 50,000 unique rows and proves it 4786ms
+ ✓ src/tests/concurrency/verification.test.ts > verification engine end to end > refuses to mark an export COMPLETED when verification fails 568ms
+stdout | src/tests/concurrency/concurrentInserts.test.ts
+◇ injected env (0) from ../.env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+stdout | src/tests/concurrency/concurrentInserts.test.ts > concurrent inserts during an export > excludes rows inserted mid-export and still produces exactly 50,000 unique rows
+
+  CONCURRENT INSERT TEST: snapshot=60000, 400/500 rows inserted while status=RUNNING (at export progress 500, 2250, 4750, 7250, 9000, 11000, 12500, 14750 rows)
+  CSV rows=50000 unique=50000 duplicates=0 maxId=50000 (<= snapshot 60000); leaked=0; all 500 deferred rows visible to the next export
+
+
+ ✓ src/tests/concurrency/concurrentInserts.test.ts > concurrent inserts during an export > excludes rows inserted mid-export and still produces exactly 50,000 unique rows
+ ✓ src/tests/concurrency/concurrentInserts.test.ts > concurrent inserts during an export > excludes rows inserted mid-export and still produces exactly 50,000 unique rows 4378ms
+
+ Test Files  3 passed (3)
+      Tests  5 passed (5)
+   Start at  10:34:03
+   Duration  85.21s (transform 139ms, setup 7ms, collect 458ms, tests 84.63s, environment 0ms, prepare 28ms)
+

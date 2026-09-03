@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.env
+.env.local
+.env.*.local
+*.log
+coverage/
+.playwright/
+playwright-report/
+test-results/
+server/tmp/
+docs/evidence/*.csv
+.DS_Store

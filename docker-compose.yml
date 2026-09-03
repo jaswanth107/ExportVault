@@ -1,0 +1,156 @@
+# ---------------------------------------------------------------------------
+# ExportVault local development stack.
+# Ports are deliberately non-default to avoid clashing with other local stacks.
+# ---------------------------------------------------------------------------
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: exportvault-db
+    environment:
+      POSTGRES_USER: exportvault
+      POSTGRES_PASSWORD: exportvault
+      POSTGRES_DB: exportvault
+    ports:
+      - "5435:5432"
+    volumes:
+      - exportvault_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U exportvault -d exportvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: exportvault-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - exportvault_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # S3-compatible object storage for local development.
+  # Production uses Cloudflare R2 with the same S3 API.
+  minio:
+    image: minio/minio:latest
+    container_name: exportvault-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: exportvault
+      MINIO_ROOT_PASSWORD: exportvault-secret
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    volumes:
+      - exportvault_miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Applies Prisma migrations once, before the API and worker start, so a
+  # fresh `docker compose up --build` yields a working schema.
+  migrate:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: exportvault-migrate
+    command: ["npx", "prisma", "migrate", "deploy"]
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://exportvault:exportvault@postgres:5432/exportvault?schema=public
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: exportvault-api
+    command: ["node", "dist/server.js"]
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      PORT: "5000"
+      DATABASE_URL: postgresql://exportvault:exportvault@postgres:5432/exportvault?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      S3_ENDPOINT: http://minio:9000
+      # Presigned download URLs must point at an address the BROWSER can reach,
+      # not the internal compose hostname the API uses.
+      S3_PUBLIC_ENDPOINT: http://localhost:9100
+      CLIENT_URL: http://localhost:5173
+    ports:
+      - "5000:5000"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # The export worker runs as its OWN service/process, never inside the API.
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: exportvault-worker
+    command: ["node", "dist/worker.js"]
+    env_file: .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://exportvault:exportvault@postgres:5432/exportvault?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    # The worker exposes no HTTP port, so the image's HTTP probe does not apply.
+    # Liveness is proved by reaching the two dependencies it cannot work without;
+    # per-job progress is tracked separately via the export_jobs heartbeat.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          const {PrismaPg}=require('@prisma/adapter-pg');const IORedis=require('ioredis');
+          const pg=new PrismaPg({connectionString:process.env.DATABASE_URL});
+          const r=new IORedis({host:process.env.REDIS_HOST,port:+(process.env.REDIS_PORT||6379),maxRetriesPerRequest:1,lazyConnect:true});
+          (async()=>{const c=await pg.connect();await c.queryRaw({sql:'SELECT 1',args:[],argTypes:[]});await r.connect();await r.ping();process.exit(0)})().catch(e=>{console.error(e);process.exit(1)});
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:5000
+    container_name: exportvault-client
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  exportvault_pgdata:
+  exportvault_redisdata:
+  exportvault_miniodata:

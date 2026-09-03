@@ -1,0 +1,59 @@
+
+> exportvault-server@1.0.0 test:integration
+> vitest run src/tests/integration
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/nxtwave/export-vault/server
+
+stdout | src/tests/integration/exports.test.ts
+◇ injected env (20) from ../.env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > creates a job, captures the snapshot boundary and queues it
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > captures the boundary at request time, excluding later inserts
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > defaults rowLimit to 50000 when omitted
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > rejects a rowLimit that is above the 50000 cap
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > rejects a rowLimit that is zero
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > rejects a rowLimit that is negative
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > rejects a rowLimit that is fractional
+ ✓ src/tests/integration/exports.test.ts > POST /api/exports > requires authentication
+ ✓ src/tests/integration/exports.test.ts > GET /api/exports > returns only the calling user's exports
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > blocks another user from GET detail with 404, never 403 leakage
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > blocks another user from GET verify with 404, never 403 leakage
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > blocks another user from GET download with 404, never 403 leakage
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > blocks another user from POST resume with 404, never 403 leakage
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > blocks another user from POST cancel with 404, never 403 leakage
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > returns 404 for an unknown export id
+ ✓ src/tests/integration/exports.test.ts > export ownership (broken access control) > rejects a non-UUID export id with 400
+ ✓ src/tests/integration/exports.test.ts > download authorization > refuses to hand out a URL for an export that is not COMPLETED
+ ✓ src/tests/integration/exports.test.ts > download authorization > refuses to hand out a URL when verification has not passed
+ ✓ src/tests/integration/exports.test.ts > cancel and resume state machine > cancels a queued export
+ ✓ src/tests/integration/exports.test.ts > cancel and resume state machine > refuses to resume a cancelled export
+ ✓ src/tests/integration/exports.test.ts > cancel and resume state machine > moves an INTERRUPTED export to RESUMING and preserves progress
+ ✓ src/tests/integration/exports.test.ts > GET /api/exports/:id verification endpoint > reports honestly that there is nothing to verify yet
+stdout | src/tests/integration/auth.test.ts
+◇ injected env (0) from ../.env // tip: ⌘ override existing { override: true }
+
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > creates a user and returns the contract shape
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > stores a bcrypt hash, never the plaintext password
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > rejects a duplicate email with 409
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > rejects missing name with a field-level validation error
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > rejects bad email with a field-level validation error
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > rejects short password with a field-level validation error
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > rejects no uppercase with a field-level validation error
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/register > rejects no digit with a field-level validation error
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/login > returns a JWT for valid credentials
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/login > rejects a wrong password with 401
+ ✓ src/tests/integration/auth.test.ts > POST /api/auth/login > does not leak whether an account exists
+ ✓ src/tests/integration/auth.test.ts > protected routes > rejects a request with no token
+ ✓ src/tests/integration/auth.test.ts > protected routes > rejects a malformed token
+ ✓ src/tests/integration/auth.test.ts > protected routes > rejects a token signed with the wrong secret
+ ✓ src/tests/integration/auth.test.ts > protected routes > accepts a valid token and returns the caller 380ms
+ ✓ src/tests/integration/auth.test.ts > GET /health > returns ok with a timestamp
+ ✓ src/tests/integration/auth.test.ts > GET /health > reports every dependency on the readiness probe
+
+ Test Files  2 passed (2)
+      Tests  39 passed (39)
+   Start at  10:33:59
+   Duration  2.56s (transform 99ms, setup 6ms, collect 377ms, tests 2.06s, environment 0ms, prepare 28ms)
+

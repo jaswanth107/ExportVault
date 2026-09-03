@@ -1,0 +1,24 @@
+{
+  "name": "export-vault",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ExportVault \u2014 a large CSV export system that doesn't lie",
+  "scripts": {
+    "infra:up": "docker compose up -d postgres redis minio",
+    "infra:down": "docker compose down",
+    "stack:up": "docker compose up -d --build",
+    "stack:down": "docker compose down",
+    "seed:records": "npm --prefix server run seed:records",
+    "test:unit": "npm --prefix server run test:unit",
+    "test:integration": "npm --prefix server run test:integration",
+    "test:concurrency": "npm --prefix server run test:concurrency",
+    "test:verification": "npm --prefix server run test:verification",
+    "test:all": "npm --prefix server run test:all",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install --with-deps chromium",
+    "evidence": "bash scripts/capture-evidence.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

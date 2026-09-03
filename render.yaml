@@ -1,0 +1,116 @@
+# ---------------------------------------------------------------------------
+# Render blueprint: API, background worker, managed PostgreSQL and Redis.
+#
+# The worker is a SEPARATE service from the API, so exports keep running when
+# the API restarts, when no browser is open, and when the developer's laptop is
+# off. Object storage (Cloudflare R2) is external and configured via env vars.
+#
+# Deploy:  render blueprint launch    (or connect this repo in the Render UI)
+# ---------------------------------------------------------------------------
+services:
+  - type: web
+    name: exportvault-api
+    runtime: docker
+    plan: starter
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerCommand: sh -c "npx prisma migrate deploy && node dist/server.js"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "5000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: exportvault-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: exportvault-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: exportvault-redis
+          type: redis
+          property: port
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false          # e.g. https://exportvault.vercel.app
+      - key: AWS_ACCESS_KEY_ID
+        sync: false          # Cloudflare R2 access key id
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false          # Cloudflare R2 secret
+      - key: AWS_REGION
+        value: auto
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false          # https://<account-id>.r2.cloudflarestorage.com
+      - key: S3_FORCE_PATH_STYLE
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: worker
+    name: exportvault-worker
+    runtime: docker
+    plan: starter
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerCommand: node dist/worker.js
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: exportvault-postgres
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          name: exportvault-redis
+          type: redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          name: exportvault-redis
+          type: redis
+          property: port
+      - key: JWT_SECRET
+        fromService:
+          name: exportvault-api
+          type: web
+          envVarKey: JWT_SECRET
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: auto
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_FORCE_PATH_STYLE
+        value: "1"
+      - key: WORKER_CONCURRENCY
+        value: "2"
+      - key: EXPORT_BATCH_SIZE
+        value: "1000"
+      - key: LOG_LEVEL
+        value: info
+
+  - type: redis
+    name: exportvault-redis
+    plan: starter
+    maxmemoryPolicy: noeviction   # BullMQ must never have jobs evicted
+    ipAllowList: []
+
+databases:
+  - name: exportvault-postgres
+    plan: basic-256mb
+    postgresMajorVersion: "16"

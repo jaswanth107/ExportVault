@@ -1,0 +1,43 @@
+API: http://localhost:5000
+health: {"status":"ok","timestamp":"2026-09-03T05:05:28.843Z"}
+export created: 1852d867-905e-480b-9d92-000abd334449
+snapshot_max_id captured at creation: 60000
+final status: COMPLETED after 3.6s
+checkpoints persisted: 200
+server-reported verification: {
+  "expectedRows": 50000,
+  "actualRows": 50000,
+  "uniqueRows": 50000,
+  "duplicates": 0,
+  "minId": 1,
+  "maxId": 50000,
+  "outOfSnapshot": 0,
+  "headerValid": true,
+  "fileBytes": 8316137,
+  "sha256": "b6bedb10c2dba7219fd52d88671b5032d73ba4c7548022efe5d5f8502f17833c",
+  "status": "PASSED",
+  "failureReason": null,
+  "verifiedAt": "2026-09-03T05:05:32.344Z"
+}
+
+downloading export-1852d867-905e-480b-9d92-000abd334449.csv (signed URL, ttl 900s)
+
+================= INDEPENDENT CSV AUDIT =================
+file bytes                 : 8316137
+sha256 (downloaded)        : b6bedb10c2dba7219fd52d88671b5032d73ba4c7548022efe5d5f8502f17833c
+sha256 (server reported)   : b6bedb10c2dba7219fd52d88671b5032d73ba4c7548022efe5d5f8502f17833c
+sha256 match               : true
+header                     : id,external_id,name,email,category,amount,status,created_at,updated_at
+header matches spec        : true
+physical lines in file     : 50201
+parsed data rows           : 50000
+unique ids                 : 50000
+duplicate ids              : 0
+rows with wrong width      : 0
+ids strictly ascending     : true
+min id / max id            : 1 / 50000
+snapshot boundary          : 60000
+ids beyond snapshot        : 0
+=========================================================
+
+AUDIT PASSED: exactly 50,000 unique rows, 0 duplicates, nothing beyond the snapshot.

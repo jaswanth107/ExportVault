@@ -1,0 +1,150 @@
+// ExportVault data model.
+//
+// Design notes that matter for correctness:
+//  * `records.id` is a BIGSERIAL. It is the ONLY column the exporter paginates
+//    on, because it is monotonically increasing and unique, which is what makes
+//    keyset pagination stable under concurrent inserts.
+//  * `export_jobs.snapshot_max_id` is the immutable upper boundary captured at
+//    job-creation time. Rows inserted after that point get a higher id and are
+//    therefore excluded from the running export by construction.
+//  * `export_checkpoints` is the durable resume log: one row per successfully
+//    written batch, written only AFTER the batch bytes are confirmed in object
+//    storage.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  name         String   @db.VarChar(100)
+  email        String   @unique(map: "users_email_idx") @db.VarChar(255)
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  exportJobs ExportJob[]
+
+  @@map("users")
+}
+
+/// The table being exported. Seeded with 60,000+ rows.
+model Record {
+  id         BigInt   @id @default(autoincrement())
+  externalId String   @unique(map: "records_external_id_idx") @map("external_id") @db.Uuid
+  name       String   @db.VarChar(255)
+  email      String   @db.VarChar(255)
+  category   String?  @db.VarChar(100)
+  amount     Decimal? @db.Decimal(12, 2)
+  status     String?  @db.VarChar(50)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([id], map: "records_id_idx")
+  @@index([createdAt], map: "records_created_at_idx")
+  @@map("records")
+}
+
+enum ExportStatus {
+  PENDING
+  QUEUED
+  RUNNING
+  INTERRUPTED
+  RESUMING
+  VERIFYING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("export_status")
+}
+
+model ExportJob {
+  id                String       @id @default(uuid()) @db.Uuid
+  userId            String       @map("user_id") @db.Uuid
+  status            ExportStatus
+  snapshotMaxId     BigInt       @map("snapshot_max_id")
+  requestedRowLimit Int          @default(50000) @map("requested_row_limit")
+  lastExportedId    BigInt?      @map("last_exported_id")
+  exportedRowCount  Int          @default(0) @map("exported_row_count")
+  batchSize         Int          @default(1000) @map("batch_size")
+  fileKey           String?      @map("file_key")
+  fileUrl           String?      @map("file_url")
+  startedAt         DateTime?    @map("started_at")
+  completedAt       DateTime?    @map("completed_at")
+  failedAt          DateTime?    @map("failed_at")
+  errorMessage      String?      @map("error_message")
+  /// Set by the API/user; the worker polls it between batches and stops cleanly.
+  cancelRequested   Boolean      @default(false) @map("cancel_requested")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @default(now()) @updatedAt @map("updated_at")
+
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checkpoints   ExportCheckpoint[]
+  failures      ExportFailure[]
+  verifications ExportVerification[]
+
+  @@index([userId], map: "export_jobs_user_id_idx")
+  @@index([status], map: "export_jobs_status_idx")
+  @@map("export_jobs")
+}
+
+/// One row per batch whose bytes are already durably stored. This is the
+/// resume log: never written before the batch is confirmed written.
+model ExportCheckpoint {
+  id           String   @id @default(uuid()) @db.Uuid
+  exportJobId  String   @map("export_job_id") @db.Uuid
+  batchNumber  Int      @map("batch_number")
+  lastRecordId BigInt   @map("last_record_id")
+  rowsWritten  Int      @map("rows_written")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  exportJob ExportJob @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+
+  @@unique([exportJobId, batchNumber], map: "export_checkpoints_job_batch_key")
+  @@map("export_checkpoints")
+}
+
+/// Durable record of every failure. Nothing is allowed to fail silently.
+model ExportFailure {
+  id           String   @id @default(uuid()) @db.Uuid
+  exportJobId  String?  @map("export_job_id") @db.Uuid
+  errorType    String   @map("error_type") @db.VarChar(255)
+  errorMessage String   @map("error_message")
+  stackTrace   String?  @map("stack_trace")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  exportJob ExportJob? @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+
+  @@index([exportJobId], map: "export_failures_job_idx")
+  @@map("export_failures")
+}
+
+/// Persisted output of the verification engine (section 15). A job may only be
+/// marked COMPLETED when its latest verification row has passed = true.
+model ExportVerification {
+  id            String   @id @default(uuid()) @db.Uuid
+  exportJobId   String   @map("export_job_id") @db.Uuid
+  expectedRows  Int      @map("expected_rows")
+  actualRows    Int      @map("actual_rows")
+  uniqueRows    Int      @map("unique_rows")
+  duplicates    Int
+  minId         BigInt?  @map("min_id")
+  maxId         BigInt?  @map("max_id")
+  outOfSnapshot Int      @default(0) @map("out_of_snapshot")
+  headerValid   Boolean  @map("header_valid")
+  fileBytes     BigInt   @map("file_bytes")
+  sha256        String?
+  passed        Boolean
+  failureReason String?  @map("failure_reason")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  exportJob ExportJob @relation(fields: [exportJobId], references: [id], onDelete: Cascade)
+
+  @@index([exportJobId], map: "export_verifications_job_idx")
+  @@map("export_verifications")
+}

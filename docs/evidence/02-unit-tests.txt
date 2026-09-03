@@ -1,0 +1,75 @@
+
+> exportvault-server@1.0.0 test:unit
+> vitest run src/tests/unit
+
+[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+
+ RUN  v2.1.9 /home/nxtwave/export-vault/server
+
+stdout | src/tests/unit/verificationEngine.test.ts
+◇ injected env (20) from ../.env // tip: ◈ secrets for agents [www.dotenvx.com]
+
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > PASSES a correct file and reports exact counts
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > detects duplicate ids and FAILS
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > FAILS when the row count is short of the target
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > FAILS when the header is wrong
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > FAILS when a row escaped the snapshot boundary
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > FAILS when ids are not strictly ascending (keyset ordering broken)
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > correctly parses rows whose fields contain commas, quotes and newlines
+ ✓ src/tests/unit/verificationEngine.test.ts > verification engine calculations > persists every verification result to the database
+stdout | src/tests/unit/resumeCheckpoint.test.ts
+◇ injected env (0) from ../.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+stdout | src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > rejects duplicate batch numbers at the database level
+prisma:error 
+Invalid `prisma.exportCheckpoint.createMany()` invocation in
+/home/nxtwave/export-vault/server/src/tests/unit/resumeCheckpoint.test.ts:31:33
+
+  28   exportJobId: string,
+  29   entries: { batchNumber: number; lastRecordId: number; rowsWritten: number }[],
+  30 ) {
+→ 31   await prisma.exportCheckpoint.createMany(
+Unique constraint failed on the constraint: `export_checkpoints_job_batch_key`
+
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > starts from scratch when no checkpoint exists
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > resumes from the last checkpoint, not from zero
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > sums a partial final batch correctly
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > refuses to resume across a gap in the checkpoint log
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > refuses to resume when checkpoint cursors are not strictly increasing
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > rejects duplicate batch numbers at the database level
+ ✓ src/tests/unit/resumeCheckpoint.test.ts > resume checkpoint logic > trusts the checkpoint log over a stale job row
+stdout | src/tests/unit/snapshotBoundary.test.ts
+◇ injected env (0) from ../.env // tip: ⌁ auth for agents [www.vestauth.com]
+
+ ✓ src/tests/unit/snapshotBoundary.test.ts > snapshot boundary filtering > captures MAX(id) as the export boundary
+ ✓ src/tests/unit/snapshotBoundary.test.ts > snapshot boundary filtering > never returns a row beyond the snapshot boundary
+ ✓ src/tests/unit/snapshotBoundary.test.ts > snapshot boundary filtering > returns rows in strictly ascending id order
+ ✓ src/tests/unit/snapshotBoundary.test.ts > snapshot boundary filtering > produces disjoint, gapless pages when walked by cursor
+ ✓ src/tests/unit/snapshotBoundary.test.ts > snapshot boundary filtering > excludes rows inserted after the boundary was captured
+ ✓ src/tests/unit/snapshotBoundary.test.ts > snapshot boundary filtering > returns an empty page once the cursor reaches the boundary
+stdout | src/tests/unit/keysetPagination.test.ts
+◇ injected env (0) from ../.env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+
+ ✓ src/tests/unit/keysetPagination.test.ts > keyset pagination guarantees > never uses OFFSET pagination anywhere in the application source
+ ✓ src/tests/unit/keysetPagination.test.ts > keyset pagination guarantees > paginates with a strict id > cursor bounded by the snapshot
+ ✓ src/tests/unit/keysetPagination.test.ts > record normalisation > stringifies BigInt ids losslessly
+ ✓ src/tests/unit/keysetPagination.test.ts > record normalisation > preserves DECIMAL(12,2) exactly as the database returned it
+ ✓ src/tests/unit/keysetPagination.test.ts > record normalisation > renders nullable columns as empty strings, never the text "null"
+ ✓ src/tests/unit/keysetPagination.test.ts > record normalisation > emits timestamps as ISO-8601 UTC
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > uses the exact deterministic column order required by the spec
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > escapeCsvField > passes plain values through unquoted
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > escapeCsvField > renders null and undefined as empty fields
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > escapeCsvField > quotes fields containing a comma
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > escapeCsvField > doubles embedded quotes and wraps the field
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > escapeCsvField > quotes fields containing newlines and carriage returns
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > escapeCsvField > preserves unicode without mangling it
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > serializeCsvRow > emits every column in order, filling missing keys with empty fields
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > serializeCsvRow > never emits more or fewer fields than there are columns
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > serializeCsvChunk > newline-terminates every row
+ ✓ src/tests/unit/csv.test.ts > CSV serialisation > serializeCsvChunk > returns an empty string for an empty batch rather than a stray newline
+
+ Test Files  5 passed (5)
+      Tests  38 passed (38)
+   Start at  10:33:58
+   Duration  856ms (transform 111ms, setup 11ms, collect 342ms, tests 387ms, environment 0ms, prepare 34ms)
+

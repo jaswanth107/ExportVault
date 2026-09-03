@@ -1,0 +1,8 @@
+# Empty catch blocks  ->  catch (...) { }
+(none found)
+
+# catch blocks returning null without logging
+(none found)
+
+# SQL OFFSET / Prisma skip: pagination in application source
+(none found)
