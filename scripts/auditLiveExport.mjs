@@ -9,6 +9,11 @@ import crypto from 'node:crypto';
 
 const API = (process.argv[2] ?? process.env.API_URL ?? 'http://localhost:5000').replace(/\/$/, '');
 const TARGET = 50_000;
+// Free hosting tiers spin services down after idle, so a cold start can take
+// ~60s and the worker may wake only after the API has. Be patient rather than
+// declaring a working deployment broken.
+const WAKE_TIMEOUT_MS = 180_000;
+const EXPORT_TIMEOUT_MS = 900_000;
 const EXPECTED_HEADER = 'id,external_id,name,email,category,amount,status,created_at,updated_at';
 
 const email = `audit-${Date.now().toString(36)}@example.com`;
@@ -74,10 +79,46 @@ function parseCsv(text) {
   return rows;
 }
 
+/** Waits for a possibly-sleeping service to answer /health. */
+async function waitForApi() {
+  const deadline = Date.now() + WAKE_TIMEOUT_MS;
+  let attempt = 0;
+  for (;;) {
+    attempt += 1;
+    try {
+      const res = await fetch(`${API}/health`);
+      if (res.ok) return await res.json();
+      console.log(`  /health returned HTTP ${res.status}; retrying (attempt ${attempt})`);
+    } catch (error) {
+      console.log(`  API not reachable yet (${error.message}); retrying (attempt ${attempt})`);
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`API at ${API} did not become healthy within ${WAKE_TIMEOUT_MS / 1000}s`);
+    }
+    await new Promise((r) => setTimeout(r, 5_000));
+  }
+}
+
 async function main() {
   console.log(`API: ${API}`);
-  const health = await call('/health');
+  console.log('waking the API (free tiers spin down when idle)...');
+  const health = await waitForApi();
   console.log(`health: ${JSON.stringify(health)}`);
+
+  // Readiness proves the API can actually reach Postgres, Redis and storage.
+  try {
+    const readyRes = await fetch(`${API}/health/ready`);
+    const ready = await readyRes.json();
+    console.log(`readiness: HTTP ${readyRes.status} ${JSON.stringify(ready.checks)}`);
+    if (!readyRes.ok) {
+      throw new Error(
+        `Dependencies are unhealthy, so the export would fail: ${JSON.stringify(ready.checks)}`,
+      );
+    }
+  } catch (error) {
+    if (error.message.startsWith('Dependencies')) throw error;
+    console.log(`readiness check could not be read: ${error.message}`);
+  }
 
   await call('/api/auth/register', {
     method: 'POST',
@@ -96,11 +137,41 @@ async function main() {
 
   const started = Date.now();
   let detail;
+  let lastReport = 0;
+  let queuedSince = null;
   for (;;) {
     detail = await call(`/api/exports/${job.id}`, { token });
     if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(detail.status)) break;
-    if (Date.now() - started > 300_000) throw new Error('Export did not finish within 5 minutes');
-    await new Promise((r) => setTimeout(r, 500));
+
+    // Surface progress instead of sitting silent for minutes.
+    if (Date.now() - lastReport > 5_000) {
+      lastReport = Date.now();
+      console.log(
+        `  status=${detail.status} rows=${detail.progress.exportedRows}/${detail.progress.targetRows} ` +
+          `(${detail.progress.percentage}%) checkpoints=${detail.checkpointCount}`,
+      );
+    }
+
+    // A job stuck in QUEUED means nothing is consuming the queue.
+    if (detail.status === 'QUEUED' || detail.status === 'PENDING') {
+      queuedSince ??= Date.now();
+      if (Date.now() - queuedSince > 120_000) {
+        throw new Error(
+          `Export sat in ${detail.status} for over 2 minutes — no worker is consuming the queue. ` +
+            'Check that the worker service is deployed, running, and pointed at the same Redis/Key Value instance as the API.',
+        );
+      }
+    } else {
+      queuedSince = null;
+    }
+
+    if (Date.now() - started > EXPORT_TIMEOUT_MS) {
+      throw new Error(
+        `Export did not finish within ${EXPORT_TIMEOUT_MS / 60_000} minutes (last status ${detail.status}, ` +
+          `${detail.progress.exportedRows} rows)`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 1_000));
   }
 
   console.log(`final status: ${detail.status} after ${((Date.now() - started) / 1000).toFixed(1)}s`);

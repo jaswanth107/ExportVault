@@ -777,6 +777,21 @@ Then set the secrets marked `sync: false` in `render.yaml`
 (`CLIENT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `S3_BUCKET`,
 `S3_ENDPOINT`). The API service runs `prisma migrate deploy` on boot.
 
+### Verifying a deployed instance
+
+One command proves a live deployment end to end — it registers a user, runs a
+real 50,000-row export, downloads the CSV through the signed URL and re-parses
+it with a parser that shares no code with the server:
+
+```bash
+npm run audit -- https://your-api.onrender.com
+```
+
+It waits out cold starts on free tiers, prints progress while the export runs,
+and fails loudly with a specific diagnosis rather than a timeout — for example,
+a job stuck in `QUEUED` for two minutes reports that no worker is consuming the
+queue instead of just giving up.
+
 ### Health checks
 
 - **API** — `GET /health` (liveness) and `GET /health/ready`, which actually

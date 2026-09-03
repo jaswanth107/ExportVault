@@ -16,7 +16,8 @@
     "test:all": "npm --prefix server run test:all",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
-    "evidence": "bash scripts/capture-evidence.sh"
+    "evidence": "bash scripts/capture-evidence.sh",
+    "audit": "node scripts/auditLiveExport.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0"
