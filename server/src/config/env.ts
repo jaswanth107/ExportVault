@@ -37,14 +37,33 @@ const schema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().min(1, 'AWS_SECRET_ACCESS_KEY is required'),
   AWS_REGION: z.string().default('auto'),
   S3_BUCKET: z.string().min(1, 'S3_BUCKET is required'),
-  S3_ENDPOINT: z.string().optional(),
+  // `.trim() || undefined` matters: a variable present-but-empty (the shape
+  // .env.example ships, and what many hosts inject for unset values) must mean
+  // "unset", not "endpoint is the empty string" — the latter silently sends
+  // signed URLs to the default AWS endpoint.
+  S3_ENDPOINT: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined),
   // Endpoint baked into presigned download URLs. Inside Docker the API reaches
   // storage at an internal hostname the browser cannot resolve, so signing must
   // use the externally reachable host. With Cloudflare R2 / AWS S3 both are the
   // same value and this can be left unset.
-  S3_PUBLIC_ENDPOINT: z.string().optional(),
+  S3_PUBLIC_ENDPOINT: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined),
   S3_FORCE_PATH_STYLE: booleanish,
   S3_SIGNED_URL_TTL: z.coerce.number().int().positive().default(900),
+  // AWS S3, Cloudflare R2 and MinIO honour response-content-disposition /
+  // response-content-type on a presigned GET, which is what makes the browser
+  // save the CSV under a friendly filename. Supabase Storage does not implement
+  // them, so set this to 0 there; the object key already ends in
+  // export-<id>.csv, so the saved filename stays sensible either way.
+  S3_RESPONSE_OVERRIDES: z
+    .string()
+    .optional()
+    .transform((v) => v === undefined || v === '' || v === '1' || v?.toLowerCase() === 'true'),
 
   CLIENT_URL: z.string().default('http://localhost:5173'),
   LOG_LEVEL: z

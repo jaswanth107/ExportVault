@@ -17,9 +17,14 @@
 #     instance-hours/month. A spun-down worker stops mid-export — which this
 #     system handles: the job goes INTERRUPTED and Resume continues from the
 #     last checkpoint. Nothing is duplicated or skipped.
-#   * Free Postgres EXPIRES 30 DAYS after creation and is capped at 1 GB.
 #   * Free Key Value is in-memory only, so queued jobs are lost on restart.
 #     Recoverable: the job row survives in Postgres and Resume re-enqueues it.
+#
+# PostgreSQL is NOT provisioned here. Render's free Postgres expires 30 days
+# after creation, which would quietly kill the deployment; Neon's free plan does
+# not expire. Set DATABASE_URL on both services to your Neon connection string —
+# use the DIRECT (non-pooled) one, so Prisma migrations and prepared statements
+# behave normally.
 #
 # TO RUN THIS PROPERLY (recommended for anything but a demo), change the two
 # `plan: free` service entries to `plan: 0.5c-512mb` and set the worker back to
@@ -39,9 +44,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: exportvault-postgres
-          property: connectionString
+        sync: false          # Neon connection string (use the DIRECT, non-pooled one)
       - key: REDIS_HOST
         fromService:
           name: exportvault-keyvalue
@@ -87,9 +90,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: exportvault-postgres
-          property: connectionString
+        sync: false          # Neon connection string (use the DIRECT, non-pooled one)
       - key: REDIS_HOST
         fromService:
           name: exportvault-keyvalue
@@ -125,8 +126,3 @@ services:
     # BullMQ must never have jobs evicted under memory pressure.
     maxmemoryPolicy: noeviction
     ipAllowList: []          # reachable only from inside the Render network
-
-databases:
-  - name: exportvault-postgres
-    plan: free               # NOTE: free Postgres expires 30 days after creation
-    postgresMajorVersion: "16"

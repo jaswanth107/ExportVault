@@ -180,15 +180,28 @@ export async function uploadStream(key: string, stream: Readable | PassThrough):
   await upload.done();
 }
 
-/** Presigned, time-limited download URL. */
+/**
+ * Presigned, time-limited download URL.
+ *
+ * The response-* overrides make the browser save the file as an attachment with
+ * a friendly name, but they are an optional part of the S3 API: Supabase
+ * Storage does not implement them, and sending unsupported signed query
+ * parameters risks a rejected signature. `S3_RESPONSE_OVERRIDES=0` drops them —
+ * the object key itself ends in `export-<id>.csv`, so the saved filename is
+ * still correct.
+ */
 export async function getSignedDownloadUrl(key: string, filename: string): Promise<string> {
   return getSignedUrl(
     s3Signer,
     new GetObjectCommand({
       Bucket: BUCKET,
       Key: key,
-      ResponseContentDisposition: `attachment; filename="${filename}"`,
-      ResponseContentType: 'text/csv; charset=utf-8',
+      ...(env.S3_RESPONSE_OVERRIDES
+        ? {
+            ResponseContentDisposition: `attachment; filename="${filename}"`,
+            ResponseContentType: 'text/csv; charset=utf-8',
+          }
+        : {}),
     }),
     { expiresIn: env.S3_SIGNED_URL_TTL },
   );

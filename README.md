@@ -564,6 +564,8 @@ real `.env` — it is gitignored.
 | `S3_PUBLIC_ENDPOINT` | – | Only when the browser cannot reach `S3_ENDPOINT` (as inside Docker) |
 | `S3_FORCE_PATH_STYLE` | – | `1` for R2 and MinIO |
 | `S3_SIGNED_URL_TTL` | – | Presigned download lifetime, seconds (default `900`) |
+| `S3_RESPONSE_OVERRIDES` | – | `1` (default) sends `response-content-disposition` on presigned GETs. Set `0` for Supabase Storage, which does not implement them |
+| `WORKER_HEALTH_PORT` | – | When set, the worker also serves `GET /health` |
 | `CLIENT_URL` | **yes** | Comma-separated CORS allowlist |
 | `LOG_LEVEL` | – | `fatal`…`trace` (default `info`) |
 | `WORKER_CONCURRENCY` | – | Concurrent export jobs per worker |
@@ -706,9 +708,9 @@ machine is off.
 | Frontend | Vercel (static build) | [`client/vercel.json`](client/vercel.json) |
 | API | Render web service (Docker) | [`render.yaml`](render.yaml) |
 | Worker | Render service, separate from the API | [`render.yaml`](render.yaml) |
-| PostgreSQL | Render managed Postgres 16 | [`render.yaml`](render.yaml) |
+| PostgreSQL | Neon (free plan) or Render managed Postgres | [`render.yaml`](render.yaml) |
 | Key Value (Redis) | Render managed, `noeviction` | [`render.yaml`](render.yaml) |
-| Object storage | Cloudflare R2 | env vars |
+| Object storage | Any S3-compatible provider | env vars |
 
 Two blueprints are provided:
 
@@ -716,6 +718,42 @@ Two blueprints are provided:
 | --- | --- | --- |
 | [`render.yaml`](render.yaml) | `web` on `plan: free` | **Render has no free `type: worker`** — workers, private services and cron jobs all start at a paid instance. On free the worker is deployed as a separate *web* service that runs `dist/worker.js` and serves `/health` to satisfy the port requirement. It is still its own service and process. |
 | [`render-production.yaml`](render-production.yaml) | real `type: worker` | Nothing spins down, Postgres does not expire, Key Value persists. |
+
+### PostgreSQL options
+
+| Provider | Free | Expires | Notes |
+| --- | --- | --- | --- |
+| **Neon** | 0.5 GB/project, 100 CU-hours/month | **No** | Used by `render.yaml`. Scales to zero after 5 min idle (cannot be disabled on free) — the first request after a pause pays a short cold start. Publicly reachable, so the dataset can be seeded from a laptop. |
+| Render Postgres | 1 GB | **Yes — 30 days** | Convenient (`fromDatabase` wiring) but the deployment silently dies a month later. Used by `render-production.yaml` on a paid plan, where it does not expire. |
+
+With Neon, use the **direct (non-pooled)** connection string — not the
+`-pooler` host — so Prisma migrations and prepared statements behave normally.
+60,000 records is roughly 10 MB, comfortably inside 0.5 GB.
+
+### Object storage options
+
+The code targets the plain S3 API, so any compatible provider works. Two that
+have a usable free tier:
+
+| Provider | Free | Card required | Settings |
+| --- | --- | --- | --- |
+| Cloudflare R2 | 10 GB | **Yes**, even on free | `S3_ENDPOINT=https://<account-id>.r2.cloudflarestorage.com`, `AWS_REGION=auto`, `S3_RESPONSE_OVERRIDES=1` |
+| Supabase Storage | 1 GB | No | `S3_ENDPOINT=https://<project-ref>.storage.supabase.co/storage/v1/s3`, `AWS_REGION=<project region>`, **`S3_RESPONSE_OVERRIDES=0`** |
+
+A finished 50,000-row export is ~8 MB, so 1 GB is ample.
+
+Supabase specifics, all verified against their S3 compatibility docs:
+
+- every operation this project uses is supported — `HeadBucket`, `CreateBucket`,
+  `PutObject`, `HeadObject`, `GetObject`, `ListObjectsV2`, `DeleteObjects` and
+  multipart upload — as are SigV4 presigned URLs;
+- `response-content-disposition` / `response-content-type` are **not**
+  implemented, hence `S3_RESPONSE_OVERRIDES=0`. The object key already ends in
+  `export-<id>.csv`, so the saved filename is still correct;
+- `S3_FORCE_PATH_STYLE=1` is required;
+- S3 access keys bypass RLS and are server-only — they belong in the Render
+  service env, never in the client bundle;
+- free Supabase projects pause after ~7 days of inactivity.
 
 Free-tier limits you accept with `render.yaml`, all of them real:
 
