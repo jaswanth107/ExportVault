@@ -79,9 +79,18 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     });
   } catch (error) {
     // Network-level failure: never swallowed into a generic empty state.
+    //
+    // The browser deliberately hides the reason from JavaScript, so a blocked
+    // CORS origin and a genuinely unreachable server are indistinguishable here
+    // — both surface as a TypeError on fetch. Naming both possibilities is the
+    // honest thing to do; claiming "the server is down" would be a guess, and
+    // sent people looking in the wrong place during this project's own deploy.
     console.error(`Network request failed: ${method} ${path}`, error);
     throw new ApiError({
-      message: `Could not reach the API at ${API_BASE}. Check that the server is running.`,
+      message:
+        `Could not reach the API at ${API_BASE}. The browser blocks the real reason, ` +
+        `but it is almost always one of: the API is asleep or down, or this site's ` +
+        `origin is not in the API's CLIENT_URL allowlist (CORS).`,
       status: 0,
       code: 'NETWORK_ERROR',
     });
