@@ -566,6 +566,7 @@ real `.env` — it is gitignored.
 | `S3_SIGNED_URL_TTL` | – | Presigned download lifetime, seconds (default `900`) |
 | `S3_RESPONSE_OVERRIDES` | – | `1` (default) sends `response-content-disposition` on presigned GETs. Set `0` for Supabase Storage, which does not implement them |
 | `WORKER_HEALTH_PORT` | – | When set, the worker also serves `GET /health` |
+| `DNS_RESULT_ORDER` | – | `ipv4first` \| `ipv6first` \| `verbatim`. Leave unset unless a managed database that publishes both A and AAAA records times out from a host with no IPv6 route |
 | `CLIENT_URL` | **yes** | Comma-separated CORS allowlist |
 | `LOG_LEVEL` | – | `fatal`…`trace` (default `info`) |
 | `WORKER_CONCURRENCY` | – | Concurrent export jobs per worker |
@@ -726,9 +727,16 @@ Two blueprints are provided:
 | **Neon** | 0.5 GB/project, 100 CU-hours/month | **No** | Used by `render.yaml`. Scales to zero after 5 min idle (cannot be disabled on free) — the first request after a pause pays a short cold start. Publicly reachable, so the dataset can be seeded from a laptop. |
 | Render Postgres | 1 GB | **Yes — 30 days** | Convenient (`fromDatabase` wiring) but the deployment silently dies a month later. Used by `render-production.yaml` on a paid plan, where it does not expire. |
 
-With Neon, use the **direct (non-pooled)** connection string — not the
-`-pooler` host — so Prisma migrations and prepared statements behave normally.
-60,000 records is roughly 10 MB, comfortably inside 0.5 GB.
+With Neon, run **migrations** against the **direct (non-pooled)** connection
+string — not the `-pooler` host — so Prisma's prepared statements behave
+normally. Runtime works fine on either. 60,000 records is roughly 10 MB,
+comfortably inside 0.5 GB.
+
+Neon publishes both A and AAAA records. On a host with no working IPv6 route,
+Node can stall on the IPv6 candidate and fail with `ETIMEDOUT` even though the
+database is reachable over IPv4 — a failure that looks like a broken database
+rather than a broken network path. If that happens, set
+`DNS_RESULT_ORDER=ipv4first`.
 
 ### Object storage options
 

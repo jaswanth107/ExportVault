@@ -1,3 +1,6 @@
+// Must run before anything opens a socket.
+import { configureDns } from './config/dns';
+
 import { createApp } from './app';
 import { env } from './config/env';
 import { assertDatabaseConnection, prisma } from './config/prisma';
@@ -16,6 +19,7 @@ import { logger, LogEvent } from './utils/logger';
  * accepted and then silently fail.
  */
 async function main(): Promise<void> {
+  configureDns();
   await assertDatabaseConnection();
   await assertRedisConnection();
   await assertStorageReady();

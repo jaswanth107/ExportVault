@@ -157,8 +157,10 @@ async function main() {
       queuedSince ??= Date.now();
       if (Date.now() - queuedSince > 120_000) {
         throw new Error(
-          `Export sat in ${detail.status} for over 2 minutes — no worker is consuming the queue. ` +
-            'Check that the worker service is deployed, running, and pointed at the same Redis/Key Value instance as the API.',
+          `Export sat in ${detail.status} for over 2 minutes — no worker claimed it. ` +
+            'Check that (a) the worker service is deployed and running, (b) it points at the SAME Redis/Key Value ' +
+            'instance as the API, and (c) it points at the SAME database. A worker sharing the queue but using a ' +
+            'different DATABASE_URL will consume the job, fail to find it, and log EXPORT_JOB_MISSING.',
         );
       }
     } else {
