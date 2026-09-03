@@ -1,35 +1,20 @@
 # ---------------------------------------------------------------------------
-# Render blueprint — FREE TIER configuration.
+# Render blueprint — PAID configuration (recommended beyond a demo).
 #
-# IMPORTANT, and the reason this file looks unusual:
-# Render has no free `type: worker`. Background workers, private services and
-# cron jobs all start at a paid instance type. Only web services, Postgres and
-# Key Value can run on `plan: free`.
+# Differences from the free render.yaml:
+#   * the worker is a real `type: worker` background service, not a web service
+#     pretending to be one;
+#   * nothing spins down, so an export is never interrupted by idle timeout;
+#   * Postgres does not expire after 30 days;
+#   * Key Value persists, so queued jobs survive a restart.
 #
-# So on the free tier the export worker is deployed as a WEB service that binds
-# a port and serves GET /health (see server/src/workers/health.server.ts). It is
-# still a completely separate service and process from the API — the property
-# the architecture actually depends on — it just satisfies Render's requirement
-# that a free service listen on a port.
-#
-# Free-tier limitations you are accepting (all real, all documented):
-#   * Services spin down after 15 minutes without traffic and share 750
-#     instance-hours/month. A spun-down worker stops mid-export — which this
-#     system handles: the job goes INTERRUPTED and Resume continues from the
-#     last checkpoint. Nothing is duplicated or skipped.
-#   * Free Postgres EXPIRES 30 DAYS after creation and is capped at 1 GB.
-#   * Free Key Value is in-memory only, so queued jobs are lost on restart.
-#     Recoverable: the job row survives in Postgres and Resume re-enqueues it.
-#
-# TO RUN THIS PROPERLY (recommended for anything but a demo), change the two
-# `plan: free` service entries to `plan: 0.5c-512mb` and set the worker back to
-# `type: worker` — see render-production.yaml for that variant.
+# Deploy with:  render blueprint launch --file render-production.yaml
 # ---------------------------------------------------------------------------
 services:
   - type: web
     name: exportvault-api
     runtime: docker
-    plan: free
+    plan: 0.5c-512mb
     rootDir: server
     dockerfilePath: ./Dockerfile
     dockerCommand: sh -c "npx prisma migrate deploy && node dist/server.js"
@@ -74,14 +59,13 @@ services:
   # Separate service and separate process from the API. Declared as `web`
   # only because Render's free tier has no worker type; it runs dist/worker.js
   # and serves /health so the platform keeps it alive.
-  - type: web
+  - type: worker
     name: exportvault-worker
     runtime: docker
-    plan: free
+    plan: 0.5c-512mb
     rootDir: server
     dockerfilePath: ./Dockerfile
     dockerCommand: node dist/worker.js
-    healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_ENV
@@ -121,12 +105,12 @@ services:
 
   - type: keyvalue
     name: exportvault-keyvalue
-    plan: free
+    plan: 256mb
     # BullMQ must never have jobs evicted under memory pressure.
     maxmemoryPolicy: noeviction
     ipAllowList: []          # reachable only from inside the Render network
 
 databases:
   - name: exportvault-postgres
-    plan: free               # NOTE: free Postgres expires 30 days after creation
+    plan: 0.1c-256mb
     postgresMajorVersion: "16"

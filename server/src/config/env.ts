@@ -52,6 +52,10 @@ const schema = z.object({
     .default('info'),
 
   WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  // When set, the worker process also serves GET /health with queue depth and
+  // its own liveness. Required by hosts that only run services which bind a
+  // port (e.g. Render's free tier, which has no background-worker type).
+  WORKER_HEALTH_PORT: z.coerce.number().int().positive().optional(),
   EXPORT_BATCH_SIZE: z.coerce.number().int().positive().max(10000).default(1000),
   EXPORT_STALL_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(45),
 

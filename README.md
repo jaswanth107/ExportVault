@@ -705,10 +705,27 @@ machine is off.
 | --- | --- | --- |
 | Frontend | Vercel (static build) | [`client/vercel.json`](client/vercel.json) |
 | API | Render web service (Docker) | [`render.yaml`](render.yaml) |
-| Worker | Render **background worker** (Docker) | [`render.yaml`](render.yaml) |
+| Worker | Render service, separate from the API | [`render.yaml`](render.yaml) |
 | PostgreSQL | Render managed Postgres 16 | [`render.yaml`](render.yaml) |
-| Redis | Render managed Redis (`noeviction`) | [`render.yaml`](render.yaml) |
+| Key Value (Redis) | Render managed, `noeviction` | [`render.yaml`](render.yaml) |
 | Object storage | Cloudflare R2 | env vars |
+
+Two blueprints are provided:
+
+| File | Worker service type | Notes |
+| --- | --- | --- |
+| [`render.yaml`](render.yaml) | `web` on `plan: free` | **Render has no free `type: worker`** — workers, private services and cron jobs all start at a paid instance. On free the worker is deployed as a separate *web* service that runs `dist/worker.js` and serves `/health` to satisfy the port requirement. It is still its own service and process. |
+| [`render-production.yaml`](render-production.yaml) | real `type: worker` | Nothing spins down, Postgres does not expire, Key Value persists. |
+
+Free-tier limits you accept with `render.yaml`, all of them real:
+
+- services **spin down after 15 minutes idle** and share 750 instance-hours per
+  month. A spun-down worker stops mid-export — which this system is built for:
+  the job goes `INTERRUPTED` and **Resume** continues from the last checkpoint
+  with nothing duplicated or skipped;
+- free Postgres **expires 30 days** after creation, capped at 1 GB;
+- free Key Value is **in-memory only**, so queued jobs are lost on restart. The
+  job row survives in Postgres and Resume re-enqueues it.
 
 ```bash
 # API + worker + Postgres + Redis
@@ -728,10 +745,14 @@ Then set the secrets marked `sync: false` in `render.yaml`
   queries Postgres, pings Redis, touches the storage bucket and reads queue
   depth. A failing dependency returns **503** and logs the reason; it never
   returns a cheerful 200 over a broken system.
-- **Worker** — no HTTP port, so its container healthcheck opens a real Postgres
-  connection and pings Redis. Per-job liveness is separate: the worker updates
-  `export_jobs.updated_at` after every batch, and the API's sweeper converts an
-  expired heartbeat into a visible `INTERRUPTED` status.
+- **Worker** — set `WORKER_HEALTH_PORT` (or deploy on a host that injects
+  `PORT`) and the worker serves `GET /health` reporting its running flag,
+  Postgres, Redis and live queue depth, answering **503** when any of those is
+  broken. Without a port it has no HTTP surface, so its container healthcheck
+  opens a real Postgres connection and pings Redis instead. Per-job liveness is
+  separate again: the worker updates `export_jobs.updated_at` after every batch,
+  and the API's sweeper converts an expired heartbeat into a visible
+  `INTERRUPTED` status.
 - **Startup** — both processes verify Postgres, Redis and object storage before
   accepting any work, and exit non-zero if a dependency is unreachable.
 

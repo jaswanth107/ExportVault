@@ -2,6 +2,7 @@ import { assertDatabaseConnection, prisma } from './config/prisma';
 import { assertRedisConnection, closeRedisConnection } from './config/redis';
 import { assertStorageReady } from './services/storage.service';
 import { createExportWorker } from './workers/export.worker';
+import { startWorkerHealthServer } from './workers/health.server';
 import { logger, LogEvent } from './utils/logger';
 import { env } from './config/env';
 
@@ -18,11 +19,20 @@ async function main(): Promise<void> {
 
   const worker = createExportWorker();
 
+  // Render's free tier has no background-worker service type, so the worker can
+  // be deployed as a port-binding service instead. PORT is what such hosts
+  // inject; WORKER_HEALTH_PORT allows setting it explicitly.
+  const healthPort = env.WORKER_HEALTH_PORT ?? (process.env.RENDER ? env.PORT : undefined);
+  const healthServer = healthPort
+    ? startWorkerHealthServer({ port: healthPort, worker })
+    : null;
+
   logger.info(
     {
       event: LogEvent.SERVER_STARTED,
       role: 'worker',
       concurrency: env.WORKER_CONCURRENCY,
+      healthPort: healthPort ?? null,
       crashAfterRows: env.EXPORT_CRASH_AFTER_ROWS ?? null,
     },
     'Export worker started',
@@ -31,6 +41,7 @@ async function main(): Promise<void> {
   const shutdown = async (signal: string) => {
     logger.info({ signal }, 'Worker shutting down');
     try {
+      healthServer?.close();
       await worker.close();
       await closeRedisConnection();
       await prisma.$disconnect();
