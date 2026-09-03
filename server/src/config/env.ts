@@ -28,9 +28,14 @@ const schema = z.object({
   REDIS_PASSWORD: z.string().optional(),
   REDIS_TLS: booleanish,
 
+  // Optional at the schema level because only the API issues and verifies
+  // tokens. Requiring it process-wide forced the worker — which never touches
+  // a JWT — to be given an auth secret just to boot, spreading a credential to
+  // a service that has no use for it. The API asserts it at startup instead.
   JWT_SECRET: z
     .string()
-    .min(32, 'JWT_SECRET must be at least 32 characters'),
+    .min(32, 'JWT_SECRET must be at least 32 characters')
+    .optional(),
   JWT_EXPIRES_IN: z.string().default('12h'),
 
   AWS_ACCESS_KEY_ID: z.string().min(1, 'AWS_ACCESS_KEY_ID is required'),
@@ -97,6 +102,22 @@ if (!parsed.success) {
 }
 
 export const env = parsed.data;
+
+/**
+ * Returns the JWT signing secret, or fails loudly.
+ *
+ * Called by the auth service on every sign/verify and by the API at startup, so
+ * a misconfigured API dies immediately rather than accepting requests and
+ * failing the first login.
+ */
+export function requireJwtSecret(): string {
+  if (!env.JWT_SECRET) {
+    throw new Error(
+      'JWT_SECRET is not set. It is required by the API process (it signs and verifies auth tokens). The export worker does not need it.',
+    );
+  }
+  return env.JWT_SECRET;
+}
 
 /** Hard cap enforced by this assignment. */
 export const MAX_ROW_LIMIT = 50_000;

@@ -92,3 +92,25 @@ describe('CSV serialisation', () => {
     });
   });
 });
+
+describe('JWT secret is required only by the API', () => {
+  it('exposes a helper that fails loudly and explains which process needs it', async () => {
+    const { requireJwtSecret } = await import('../../config/env');
+    // The test environment does provide a secret, so this must return it.
+    expect(typeof requireJwtSecret()).toBe('string');
+    expect(requireJwtSecret().length).toBeGreaterThanOrEqual(32);
+  });
+
+  it('is not referenced anywhere in the worker code path', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const src = path.resolve(__dirname, '..', '..');
+    // The worker entrypoint and everything it owns must never demand the secret,
+    // so a deployment does not have to hand an auth credential to a service that
+    // never signs or verifies a token.
+    for (const file of ['worker.ts', 'workers/export.worker.ts', 'workers/health.server.ts']) {
+      const content = fs.readFileSync(path.join(src, file), 'utf8');
+      expect(content, `${file} must not reference JWT_SECRET`).not.toMatch(/JWT_SECRET|requireJwtSecret/);
+    }
+  });
+});

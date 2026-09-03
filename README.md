@@ -555,7 +555,7 @@ real `.env` — it is gitignored.
 | `REDIS_HOST` / `REDIS_PORT` | **yes** | Redis for BullMQ |
 | `REDIS_PASSWORD` | – | Set for managed Redis |
 | `REDIS_TLS` | – | `1` when the provider needs TLS (e.g. Upstash) |
-| `JWT_SECRET` | **yes** | Min. 32 chars; the process refuses to boot otherwise |
+| `JWT_SECRET` | **API only** | Min. 32 chars. Required by the API, which signs and verifies tokens; the worker never touches a JWT and does not need it. The API asserts it at startup and refuses to boot without it |
 | `JWT_EXPIRES_IN` | – | Token lifetime (default `12h`) |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | **yes** | S3/R2 credentials |
 | `AWS_REGION` | – | `auto` for R2 |

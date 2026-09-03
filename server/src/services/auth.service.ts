@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../config/prisma';
-import { env } from '../config/env';
+import { env, requireJwtSecret } from '../config/env';
 import { logger, LogEvent } from '../utils/logger';
 import { ConflictError, UnauthorizedError } from '../utils/errors';
 
@@ -13,14 +13,14 @@ export interface JwtPayload {
 }
 
 export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, env.JWT_SECRET, {
+  return jwt.sign(payload, requireJwtSecret(), {
     expiresIn: env.JWT_EXPIRES_IN,
   } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JwtPayload {
   try {
-    return jwt.verify(token, env.JWT_SECRET) as JwtPayload;
+    return jwt.verify(token, requireJwtSecret()) as JwtPayload;
   } catch (error) {
     // The reason is logged for operators but never leaked to the client.
     logger.warn({ err: error }, 'JWT verification failed');

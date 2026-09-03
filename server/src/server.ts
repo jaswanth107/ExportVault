@@ -2,7 +2,7 @@
 import { configureDns } from './config/dns';
 
 import { createApp } from './app';
-import { env } from './config/env';
+import { env, requireJwtSecret } from './config/env';
 import { assertDatabaseConnection, prisma } from './config/prisma';
 import { assertRedisConnection, closeRedisConnection } from './config/redis';
 import { assertStorageReady } from './services/storage.service';
@@ -20,6 +20,10 @@ import { logger, LogEvent } from './utils/logger';
  */
 async function main(): Promise<void> {
   configureDns();
+
+  // Fail fast: an API without a signing secret would accept traffic and then
+  // reject every login. The worker deliberately does not require this.
+  requireJwtSecret();
   await assertDatabaseConnection();
   await assertRedisConnection();
   await assertStorageReady();
