@@ -20,21 +20,21 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-slate-100">Export control</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 max-w-2xl text-sm text-slate-400">
             Large CSV exports with a stable snapshot boundary, checkpointed batches and mandatory
             verification.
           </p>
         </div>
-        <Link to="/exports/new">
-          <Button>Create 50,000 Row Export</Button>
+        <Link to="/exports/new" className="shrink-0">
+          <Button className="w-full sm:w-auto">Create 50,000 Row Export</Button>
         </Link>
       </div>
 
       {query.isPending ? (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[0, 1, 2, 3].map((i) => (
             <SkeletonBlock key={i} className="h-[86px]" />
           ))}
@@ -48,7 +48,7 @@ export function DashboardPage() {
         />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Stat label="Total export jobs" value={formatNumber(query.data.stats.total)} />
             <Stat
               label="Completed"
@@ -91,7 +91,7 @@ export function DashboardPage() {
                   >
                     {shortId(query.data.stats.latest.id)}…
                   </Link>
-                  <span className="ml-auto text-xs text-slate-500">
+                  <span className="text-xs text-slate-500 sm:ml-auto">
                     created {formatDateTime(query.data.stats.latest.createdAt)}
                   </span>
                 </div>

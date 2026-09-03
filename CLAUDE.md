@@ -19,6 +19,7 @@ what was decided, what broke, how it was fixed, and what was actually verified.
 | Worker isolation | Separate process (`dist/worker.js`), separate container / Render service | Exports must not depend on the API's request lifecycle or on a browser being open. |
 | Prisma version | 7.10.0 (latest **stable**; 8.x is still RC) | Prisma 7 moved the datasource URL out of `schema.prisma`; the repo uses `prisma.config.ts` plus the `@prisma/adapter-pg` driver adapter. |
 | Password hashing | `bcryptjs`, cost 12 | Same bcrypt algorithm as the native module, without needing build toolchains in the slim Docker image. |
+| App shell | Full-width layout, one `<aside>` sidebar: static from `lg`, off-canvas drawer below | A single element at every breakpoint keeps one copy of each link in the accessibility tree. Separate mobile/desktop navs would duplicate every link and make selectors and screen-reader output ambiguous. |
 
 ### Data flow
 
@@ -64,6 +65,9 @@ npx playwright test                       # end-to-end through the real UI
 | 6 | `MaxListenersExceededWarning` while assembling 50 chunks into one stream. | Replaced per-chunk `pipeline(src, dst, {end:false})` with an explicit backpressure-aware pump (`for await … write / once('drain')`). |
 | 7 | The `client` container crashed: `vite preview` tries to write a temp file into `node_modules`, which is root-owned. | Client image now builds to static assets and serves them with nginx (SPA fallback), matching how Vercel serves the same bundle. |
 | 8 | The worker container inherited the API image's HTTP healthcheck and could never pass it — it serves no HTTP port. | Compose overrides the worker healthcheck with a real Postgres + Redis connectivity probe. |
+| 9 | Presigned download URLs were signed against the internal `minio:9000` hostname, so no browser could fetch them. Both the independent audit and the E2E download step failed identically. | Added `S3_PUBLIC_ENDPOINT` and a second S3 client used only for signing. Collapses to a no-op on R2/S3 where the API and the browser share a host. |
+| 10 | Responsive drawer assertions read the sidebar position immediately after the click, catching it mid-transition. | The panel slides over 200ms, so its position is polled; `aria-expanded` is asserted immediately since state flips synchronously. |
+| 11 | The responsive suite registered a user per test and tripped the 20/min auth rate limiter. | The limiter was right. The spec now creates one account over the API in `beforeAll` and seeds the token into `localStorage`, so it makes two auth calls in total. |
 
 ---
 

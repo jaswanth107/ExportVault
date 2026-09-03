@@ -100,7 +100,7 @@ export function ExportDetailPage() {
           ← Export history
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <h1 className="font-mono text-base font-semibold text-slate-100" data-testid="export-id">
+          <h1 className="font-mono text-sm break-all text-slate-100 sm:text-base sm:font-semibold" data-testid="export-id">
             {job.id}
           </h1>
           <StatusBadge status={job.status} />
@@ -183,7 +183,7 @@ export function ExportDetailPage() {
         </div>
       </Panel>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 xl:grid-cols-2">
         <Panel>
           <PanelHeader title="Job details" />
           <div className="px-5 py-2">

@@ -12,8 +12,8 @@ function Row({
   ok?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-vault-800 py-2.5 last:border-0">
-      <span className="text-xs text-slate-400">{label}</span>
+    <div className="flex items-center justify-between gap-4 border-b border-vault-800 py-2.5 last:border-0">
+      <span className="shrink-0 text-xs text-slate-400">{label}</span>
       <span
         className={`font-mono text-sm font-semibold tabular-nums ${
           ok === undefined ? 'text-slate-200' : ok ? 'text-emerald-300' : 'text-red-300'

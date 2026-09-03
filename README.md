@@ -90,6 +90,42 @@ The frontend never generates CSV. The API never generates CSV. Only the worker
 does, and only in a separate process that keeps running when the browser, the
 API, or the developer's laptop goes away.
 
+### Application shell
+
+The UI is a full-width shell with a persistent left sidebar:
+
+```
+lg and above (>=1024px)          below lg
+┌──────────┬──────────────┐      ┌─────────────────────┐
+│ sidebar  │              │      │ ☰  ExportVault      │  sticky top bar
+│          │  main        │      ├─────────────────────┤
+│ Dashboard│  content     │      │                     │
+│ History  │  fills the   │      │  main content       │
+│ New      │  rest of the │      │  full width         │
+│          │  window      │      │                     │
+│ ─────────│              │      └─────────────────────┘
+│ user     │              │      ☰ opens the same sidebar
+│ sign out │              │        as an off-canvas drawer
+└──────────┴──────────────┘
+```
+
+It is **one** `<aside>` element at every breakpoint — statically laid out from
+`lg` up, translated off-canvas below it — rather than separate mobile and
+desktop navigations. Two copies would duplicate every link in the accessibility
+tree and make "Dashboard" ambiguous to both screen readers and test selectors.
+
+Accessibility and responsiveness are enforced by tests rather than eyeballed
+(`e2e/responsive.spec.ts`, 8 tests across 1440 / 820 / 390 px):
+
+- the nav is reachable from every route at every width;
+- the drawer opens from the hamburger, closes on `Escape`, closes on
+  navigation, and returns focus to the control that opened it;
+- `aria-expanded` / `aria-controls` track the drawer state, the active link
+  carries `aria-current`, and a "Skip to content" link precedes the sidebar;
+- main content spans the full window minus the sidebar — asserted numerically,
+  not assumed;
+- no page scrolls horizontally at any of the three widths.
+
 ### Why the file is built from per-batch chunks
 
 Each batch is written as its own immutable object:
@@ -426,6 +462,10 @@ drift from reality.
 | 10 | Export history | `09-export-history.png` |
 | 11 | Downloaded CSV evidence (filename, size, sha256) | `10-downloaded-csv-evidence.png` |
 | 12 | Resumed export verified | `11-resumed-export-verified.png` |
+| 13 | Full-width desktop layout with the left sidebar | `12-layout-desktop.png` |
+| 14 | Tablet layout, nav collapsed to a drawer | `13-layout-tablet.png` |
+| 15 | Mobile layout, stacked panels | `14-layout-mobile.png` |
+| 16 | Mobile navigation drawer open | `15-mobile-nav-drawer.png` |
 
 ---
 
@@ -634,6 +674,7 @@ npm run test:e2e          # Playwright, against the running stack
 | **Integration** | Registration, login, bcrypt storage, account-enumeration resistance, JWT rejection paths, export creation + snapshot capture, row-limit validation, ownership isolation across five routes, download authorization, cancel/resume state machine, readiness probe |
 | **Reliability** | Real worker process killed mid-export; sweeper visibility; resume from checkpoint; crash between write and checkpoint; 500 concurrent inserts during a live export; full verification evidence |
 | **E2E** | Register → login → create export → watch progress → completion → verification → download, plus a UI-driven `docker kill` of the worker, resume, and re-verification |
+| **Responsive** | Sidebar/drawer behaviour, keyboard dismissal, focus handling, full-width content and horizontal-overflow checks at desktop, tablet and mobile widths |
 
 Latest full run — transcripts in [`docs/evidence/`](docs/evidence):
 
@@ -641,9 +682,9 @@ Latest full run — transcripts in [`docs/evidence/`](docs/evidence):
 Unit          5 files   38 passed (38)     docs/evidence/02-unit-tests.txt
 Integration   2 files   39 passed (39)     docs/evidence/03-integration-tests.txt
 Reliability   3 files    5 passed (5)      docs/evidence/04-concurrency-tests.txt
-End-to-end    2 files    3 passed (3)      Playwright, against the running stack
+End-to-end    3 files   11 passed (11)     Playwright, against the running stack
                         ─────────────────
-                        85 passed, 0 failed
+                        93 passed, 0 failed
 ```
 
 `./scripts/capture-evidence.sh` regenerates every file in `docs/evidence/` from scratch,

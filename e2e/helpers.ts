@@ -29,6 +29,48 @@ export function docker(args: string[]): string {
   return execFileSync('docker', args, { encoding: 'utf8' }).trim();
 }
 
+export const API_URL = process.env.E2E_API_URL ?? 'http://localhost:5000';
+
+/**
+ * Creates one account over the API and returns its token.
+ *
+ * Specs that need many browser sessions should call this ONCE and seed the
+ * token with `seedSession`, rather than registering per test — the auth rate
+ * limiter (20/min) is deliberately tight and driving it through the UI eight
+ * times in a row trips it, which is the limiter working, not a bug.
+ */
+export async function createAccountViaApi(prefix: string): Promise<{ email: string; token: string }> {
+  const user = uniqueUser(prefix);
+
+  const registerRes = await fetch(`${API_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(user),
+  });
+  if (!registerRes.ok) {
+    throw new Error(`Could not create the test account: HTTP ${registerRes.status} ${await registerRes.text()}`);
+  }
+
+  const loginRes = await fetch(`${API_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ email: user.email, password: user.password }),
+  });
+  if (!loginRes.ok) {
+    throw new Error(`Could not log the test account in: HTTP ${loginRes.status} ${await loginRes.text()}`);
+  }
+
+  const { token } = (await loginRes.json()) as { token: string };
+  return { email: user.email, token };
+}
+
+/** Injects an existing session token so the page loads already authenticated. */
+export async function seedSession(page: Page, token: string): Promise<void> {
+  await page.addInitScript((value: string) => {
+    window.localStorage.setItem('exportvault.token', value);
+  }, token);
+}
+
 export async function registerAndLogin(
   page: Page,
   user: { name: string; email: string; password: string },

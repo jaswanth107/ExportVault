@@ -7,6 +7,22 @@ import { formatDateTime, formatNumber, shortId } from '../utils/format';
 
 const LIVE_STATUSES = new Set(['QUEUED', 'RUNNING', 'RESUMING', 'VERIFYING', 'PENDING']);
 
+/**
+ * Narrow screens drop the columns that are recoverable from the detail page,
+ * so the essentials (id, status, rows exported, action) stay readable without
+ * the table sliding sideways.
+ */
+const COLUMNS = [
+  { label: 'Export ID', className: '' },
+  { label: 'Status', className: '' },
+  { label: 'Requested', className: 'hidden sm:table-cell' },
+  { label: 'Exported', className: '' },
+  { label: 'Created', className: 'hidden lg:table-cell' },
+  { label: 'Completed', className: 'hidden xl:table-cell' },
+  { label: 'Verification', className: 'hidden md:table-cell' },
+  { label: '', className: '' },
+] as const;
+
 export function ExportHistoryPage() {
   const query = useQuery({
     queryKey: ['exports'],
@@ -17,13 +33,13 @@ export function ExportHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-end justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-lg font-semibold text-slate-100">Export history</h1>
           <p className="mt-1 text-sm text-slate-400">Every export job created by your account.</p>
         </div>
-        <Link to="/exports/new">
-          <Button>Create 50,000 Row Export</Button>
+        <Link to="/exports/new" className="shrink-0">
+          <Button className="w-full sm:w-auto">Create 50,000 Row Export</Button>
         </Link>
       </div>
 
@@ -56,16 +72,15 @@ export function ExportHistoryPage() {
             <table className="w-full text-left text-sm">
               <thead>
                 <tr className="border-b border-vault-700/70 bg-vault-850/50">
-                  {['Export ID', 'Status', 'Requested', 'Exported', 'Created', 'Completed', 'Verification', ''].map(
-                    (heading) => (
-                      <th
-                        key={heading}
-                        className="px-4 py-2.5 text-[11px] font-semibold tracking-wider text-slate-500 uppercase"
-                      >
-                        {heading}
-                      </th>
-                    ),
-                  )}
+                  {COLUMNS.map((column) => (
+                    <th
+                      key={column.label || 'actions'}
+                      scope="col"
+                      className={`px-4 py-2.5 text-[11px] font-semibold tracking-wider text-slate-500 uppercase ${column.className}`}
+                    >
+                      {column.label}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-vault-800">
@@ -75,19 +90,19 @@ export function ExportHistoryPage() {
                     <td className="px-4 py-3">
                       <StatusBadge status={job.status} />
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs tabular-nums text-slate-400">
+                    <td className="hidden px-4 py-3 font-mono text-xs tabular-nums text-slate-400 sm:table-cell">
                       {formatNumber(job.requestedRowLimit)}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs tabular-nums text-slate-300">
                       {formatNumber(job.exportedRowCount)}
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap text-slate-500">
+                    <td className="hidden px-4 py-3 text-xs whitespace-nowrap text-slate-500 lg:table-cell">
                       {formatDateTime(job.createdAt)}
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap text-slate-500">
+                    <td className="hidden px-4 py-3 text-xs whitespace-nowrap text-slate-500 xl:table-cell">
                       {formatDateTime(job.completedAt)}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="hidden px-4 py-3 md:table-cell">
                       {job.verification ? (
                         <span
                           className={`font-mono text-[11px] font-semibold ${

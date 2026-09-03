@@ -125,9 +125,13 @@ export function Stat({
 
 export function Field({ label, value, mono = true }: { label: string; value: ReactNode; mono?: boolean }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-vault-800 py-2.5 last:border-0">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className={`text-right text-xs text-slate-200 ${mono ? 'font-mono' : ''}`}>{value}</span>
+    // Stacked on narrow screens so a long value (a UUID) cannot squeeze the
+    // label into a wrapped column.
+    <div className="flex flex-col gap-0.5 border-b border-vault-800 py-2.5 last:border-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <span className="shrink-0 text-xs text-slate-500">{label}</span>
+      <span className={`text-xs break-all text-slate-200 sm:text-right ${mono ? 'font-mono' : ''}`}>
+        {value}
+      </span>
     </div>
   );
 }
