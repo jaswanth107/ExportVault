@@ -17,6 +17,13 @@
 #     instance-hours/month. A spun-down worker stops mid-export — which this
 #     system handles: the job goes INTERRUPTED and Resume continues from the
 #     last checkpoint. Nothing is duplicated or skipped.
+#   * A spun-down worker also has nothing to wake it: the browser keeps the API
+#     warm, but no traffic ever reaches the worker's URL, so it stays asleep and
+#     new jobs pile up at QUEUED / 0 rows. WORKER_WAKE_URL on the API fixes
+#     this — it sends one GET to the worker after enqueuing. You MUST set it,
+#     or exports will never start. A keep-alive pinger is the wrong fix here:
+#     two always-on free services burn ~1,440 instance-hours against a
+#     750-hour monthly allowance.
 #   * Free Key Value is in-memory only, so queued jobs are lost on restart.
 #     Recoverable: the job row survives in Postgres and Resume re-enqueues it.
 #
@@ -73,6 +80,18 @@ services:
         value: "1"
       - key: S3_RESPONSE_OVERRIDES
         value: "0"           # Supabase Storage does not support them. Set "1" for R2/S3.
+      # REQUIRED on the free tier, and the reason exports work here at all.
+      # Free services spin down after ~15 minutes idle. The API stays warm
+      # because the browser talks to it; the worker has its own URL that
+      # nothing ever visits, so once it spins down it never comes back and
+      # every export sits at QUEUED / 0 rows forever. The API sends one GET
+      # here after enqueuing, which cold-starts the worker.
+      # Set it to the worker service's health endpoint:
+      #   https://exportvault-worker.onrender.com/health
+      # It cannot be wired with `fromService` because that yields a bare host
+      # and this needs a full URL with scheme and path.
+      - key: WORKER_WAKE_URL
+        sync: false
       - key: LOG_LEVEL
         value: info
 

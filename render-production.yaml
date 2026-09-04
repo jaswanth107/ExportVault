@@ -4,7 +4,10 @@
 # Differences from the free render.yaml:
 #   * the worker is a real `type: worker` background service, not a web service
 #     pretending to be one;
-#   * nothing spins down, so an export is never interrupted by idle timeout;
+#   * nothing spins down, so an export is never interrupted by idle timeout —
+#     and WORKER_WAKE_URL is deliberately absent here. A background worker is
+#     always consuming the queue, so there is nothing to wake; the API's wake
+#     call compiles away to a no-op when the variable is unset;
 #   * Postgres does not expire after 30 days;
 #   * Key Value persists, so queued jobs survive a restart.
 #

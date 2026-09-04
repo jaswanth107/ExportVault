@@ -1,5 +1,6 @@
 import { Queue, QueueEvents } from 'bullmq';
 import { getRedisConnection } from '../config/redis';
+import { wakeWorker } from './workerWake';
 import { logger, LogEvent } from '../utils/logger';
 
 export const EXPORT_QUEUE_NAME = 'export-jobs';
@@ -45,6 +46,18 @@ export async function enqueueExportJob(payload: ExportJobPayload): Promise<void>
         { exportJobId: payload.exportJobId, state },
         'Export already has an active queue job; not enqueuing a duplicate',
       );
+      // 'active' means either a live worker holds the lock — in which case the
+      // wake is a cheap no-op ping — or a worker died mid-export and left the
+      // lock behind. On a host that spins workers down mid-job the second case
+      // is routine, and nothing reclaims a stale lock while no worker is
+      // running, so a Resume would silently do nothing. Waking is what breaks
+      // that deadlock: the booting worker's stalled-job checker reclaims the
+      // job. Correct in both readings of 'active', harmful in neither.
+      wakeWorker({
+        exportJobId: payload.exportJobId,
+        trigger: payload.trigger,
+        reason: 'already-active',
+      });
       return;
     }
     await existing.remove();
@@ -56,6 +69,14 @@ export async function enqueueExportJob(payload: ExportJobPayload): Promise<void>
     { event: LogEvent.EXPORT_QUEUED, exportJobId: payload.exportJobId, trigger: payload.trigger },
     'Export job queued',
   );
+
+  // The queue entry is durable now, so make sure something is running to
+  // consume it. Fire-and-forget by design — see workerWake.ts.
+  wakeWorker({
+    exportJobId: payload.exportJobId,
+    trigger: payload.trigger,
+    reason: 'enqueued',
+  });
 }
 
 /** Queue depth snapshot used by the health endpoint. */

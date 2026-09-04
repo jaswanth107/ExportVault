@@ -566,6 +566,7 @@ real `.env` — it is gitignored.
 | `S3_SIGNED_URL_TTL` | – | Presigned download lifetime, seconds (default `900`) |
 | `S3_RESPONSE_OVERRIDES` | – | `1` (default) sends `response-content-disposition` on presigned GETs. Set `0` for Supabase Storage, which does not implement them |
 | `WORKER_HEALTH_PORT` | – | When set, the worker also serves `GET /health` |
+| `WORKER_WAKE_URL` | **free-tier API** | The worker's health URL. After enqueuing a job the API sends one GET here to cold-start a worker that the host has spun down. **Required on Render's free tier** — without it the worker sleeps permanently and every export stays at `QUEUED / 0 rows`. Leave empty locally and for an always-on background worker |
 | `DNS_RESULT_ORDER` | – | `ipv4first` \| `ipv6first` \| `verbatim`. Leave unset unless a managed database that publishes both A and AAAA records times out from a host with no IPv6 route |
 | `CLIENT_URL` | **yes** | Comma-separated CORS allowlist |
 | `LOG_LEVEL` | – | `fatal`…`trace` (default `info`) |
@@ -816,6 +817,39 @@ queue instead of just giving up.
   `INTERRUPTED` status.
 - **Startup** — both processes verify Postgres, Redis and object storage before
   accepting any work, and exit non-zero if a dependency is unreachable.
+
+### Waking a worker that the host spun down
+
+On a host with no free background-worker tier the worker runs as a web service
+that scales to zero after ~15 minutes idle. That creates an asymmetry which is
+easy to miss and fatal in practice: **the browser keeps the API warm, but
+nothing ever visits the worker's URL.** The worker spins down once, stays down,
+and every export after that is accepted, queued, and never consumed — the UI
+shows `QUEUED / 0 rows` indefinitely while `/health/ready` reports
+`waiting: N, active: 0` with every dependency green.
+
+So after enqueuing, the API sends a single `GET` to `WORKER_WAKE_URL`, which
+cold-starts the worker. Properties worth knowing:
+
+- **Fire-and-forget.** A cold start takes ~20-25s. The export-creation response
+  never waits for it; `wakeWorker()` returns `void` specifically so it cannot
+  be awaited by accident.
+- **Failure is non-fatal.** The job is already durable in Postgres and Redis
+  before the wake is sent, so a failed wake costs latency, never correctness.
+  It logs `WORKER_WAKE_FAILED` and the job waits for the next wake or a manual
+  Resume.
+- **One boot per burst.** Concurrent enqueues join the in-flight request rather
+  than firing several cold starts — a single boot drains everything waiting.
+- **It also breaks the stale-lock deadlock.** If a worker dies mid-export the
+  BullMQ entry stays `active`, and nothing reclaims it while no worker is
+  running — so Resume would silently do nothing. The wake is sent on that path
+  too; the booting worker's stalled-job checker then reclaims the job.
+- **Unset is a no-op**, which is correct locally and for a real background
+  worker.
+
+A keep-alive pinger is the wrong fix on a free plan: keeping two services
+always-on burns ~1,440 instance-hours against a 750-hour monthly allowance.
+Waking on demand costs one request per export.
 
 ### Deployment status
 

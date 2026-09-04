@@ -80,6 +80,22 @@ const schema = z.object({
   // its own liveness. Required by hosts that only run services which bind a
   // port (e.g. Render's free tier, which has no background-worker type).
   WORKER_HEALTH_PORT: z.coerce.number().int().positive().optional(),
+  // Set on the API when the worker runs on a host that scales it to zero while
+  // idle. After a job is enqueued the API sends one GET here so something is
+  // actually running to consume it — see queues/workerWake.ts for why that is
+  // necessary. Leave unset for local development and for a real always-on
+  // background worker; the wake then compiles away to a no-op.
+  //
+  // Trimmed to undefined when empty for the same reason as S3_ENDPOINT: hosts
+  // inject unset `sync: false` variables as the empty string, and "" must mean
+  // "unset" rather than an unfetchable URL that logs a warning on every export.
+  WORKER_WAKE_URL: z
+    .string()
+    .optional()
+    .transform((v) => v?.trim() || undefined)
+    .refine((v) => v === undefined || /^https?:\/\//.test(v), {
+      message: 'WORKER_WAKE_URL must be an http(s) URL, e.g. https://<worker>.onrender.com/health',
+    }),
   EXPORT_BATCH_SIZE: z.coerce.number().int().positive().max(10000).default(1000),
   EXPORT_STALL_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(45),
 
