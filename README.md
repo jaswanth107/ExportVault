@@ -891,6 +891,13 @@ into download URLs.
 - **No SQL injection surface** — every query is parameterised, including the raw
   keyset query.
 - **Log redaction** for `authorization`, cookies, passwords and AWS secrets.
+- **The password box is empty on arrival.** The client never persists a
+  credential — only the JWT reaches `localStorage` — but the browser's own
+  password manager fills a saved password into the sign-in form on load. The
+  field is held read-only across that window, which Chrome's fill skips; the
+  guard lifts on first interaction or when the window closes, so third-party
+  password managers still work. `autocomplete` stays `current-password`, so the
+  browser can still offer to save.
 - **Production error responses** never leak internals: a 500 returns a generic
   message plus a `requestId` that ties back to the full stack trace in the logs.
 - **Resource limits** — `rowLimit` is capped at 50,000 and a 100 kB JSON body

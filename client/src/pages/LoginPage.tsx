@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { ApiError } from '../api/client';
@@ -73,6 +73,7 @@ export function LoginPage() {
           onChange={setPassword}
           autoComplete="current-password"
           placeholder="••••••••••"
+          suppressAutofill
         />
 
         <Button type="submit" disabled={submitting} className="w-full">
@@ -129,6 +130,7 @@ export function TextField({
   autoComplete,
   placeholder,
   hint,
+  suppressAutofill,
 }: {
   id: string;
   label: string;
@@ -138,7 +140,40 @@ export function TextField({
   autoComplete?: string;
   placeholder?: string;
   hint?: string;
+  /**
+   * Keeps the browser from pre-filling a saved credential on page load, so the
+   * field is empty until the user puts something in it.
+   */
+  suppressAutofill?: boolean;
 }) {
+  // Chrome fills a saved password into a sign-in form as the page loads, and
+  // deliberately ignores autocomplete="off" on password inputs — so that is not
+  // a fix. It does skip inputs that are read-only, which is what this guard
+  // uses: the field is read-only across the load window, so the fill passes it
+  // by and the box the user arrives at is empty.
+  //
+  // Chosen over autocomplete="new-password", which also suppresses the fill but
+  // tells the browser this is a signup field — that triggers "suggest a strong
+  // password" on a sign-in form and breaks the offer to save or update the
+  // credential afterwards. The guard keeps autocomplete honest.
+  const [autofillGuarded, setAutofillGuarded] = useState(suppressAutofill === true);
+
+  // The guard covers the load window and nothing more. Left on permanently it
+  // would also block the things that *should* be able to write to the field —
+  // 1Password and friends, which set the value without the user ever focusing
+  // the input, and test automation. Whichever comes first wins: the user
+  // reaching for the field, or the fill window closing.
+  useEffect(() => {
+    if (!autofillGuarded) return;
+    const timer = setTimeout(() => setAutofillGuarded(false), 600);
+    return () => clearTimeout(timer);
+  }, [autofillGuarded]);
+
+  // Pointer-down lands before focus for mouse and touch, so the input is
+  // already editable by the time focus arrives and assistive tech never
+  // announces it as read-only.
+  const releaseGuard = autofillGuarded ? () => setAutofillGuarded(false) : undefined;
+
   return (
     <div>
       <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-slate-300">
@@ -151,6 +186,9 @@ export function TextField({
         value={value}
         placeholder={placeholder}
         autoComplete={autoComplete}
+        readOnly={autofillGuarded}
+        onPointerDown={releaseGuard}
+        onFocus={releaseGuard}
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-lg border border-vault-700 bg-vault-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/40 focus:outline-none"
       />
